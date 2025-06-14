@@ -1,4 +1,4 @@
-# ProductWindow.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QLabel, QComboBox, 
     QMessageBox, QScrollArea, QFrame, QDialog, QLineEdit
@@ -121,7 +121,7 @@ class ProductWidget(QWidget):
             self.typeCombo.addItem(type_.Наименование, type_.id)
 
     def load_cards(self, search_query=None, type_id=None):
-        # Очищаем текущие карточки
+        
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
             if widget:

@@ -1,4 +1,4 @@
-# WarehouseWindow.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QDialog, QFormLayout, QTextEdit,
     QComboBox, QLineEdit, QMessageBox, QSizePolicy, QScrollArea, QFrame, QLabel
@@ -85,13 +85,13 @@ class AddWarehouseDialog(QDialog):
             return
 
         if self.warehouse:
-            # Update existing warehouse
+            
             self.warehouse.Название = name
             self.warehouse.id_тип = self.type_combo.currentData()
             self.warehouse.Описание = self.description_edit.text().strip() or None
             self.warehouse.id_юр_адрес = self.address_combo.currentData()
         else:
-            # Create new warehouse
+            
             new_warehouse = Warehouse(
                 Название=name,
                 id_тип=self.type_combo.currentData(),
@@ -115,7 +115,7 @@ class SelectWarehouseDialog(QDialog):
         layout = QFormLayout(self)
 
         self.warehouse_combo = QComboBox()
-        self.warehouse_combo.addItem("Все склады", None)  # Опция для всех складов
+        self.warehouse_combo.addItem("Все склады", None)  
         warehouses = self.session.query(Warehouse).all()
         for warehouse in warehouses:
             self.warehouse_combo.addItem(warehouse.Название, warehouse.id)
@@ -245,14 +245,14 @@ class WarehouseWidget(QWidget):
         self.setStyleSheet(TABLE_WIDGET_STYLE)
 
     def load_cards(self):
-        # Очищаем текущие карточки
+        
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
         self.selected_card = None
 
-        # Получаем все склады
+        
         warehouses = self.session.query(Warehouse).all()
 
         if not warehouses:
@@ -300,17 +300,17 @@ class WarehouseWidget(QWidget):
                 QMessageBox.critical(self, "Ошибка", f"Не удалось удалить склад: {str(e)}")
 
     def generate_stock_report(self):
-        # Открываем диалоговое окно для выбора склада
+        
         dialog = SelectWarehouseDialog(self.session, self)
         if dialog.exec() != QDialog.Accepted:
-            return  # Прерываем, если пользователь нажал "Отмена"
+            return  
 
         selected_warehouse_id = dialog.get_selected_warehouse_id()
 
-        # Регистрация шрифта
+        
         pdfmetrics.registerFont(TTFont('SegoeUIRegular', 'C:/Windows/Fonts/SegoeUI.ttf'))
 
-        # Получаем склады
+        
         if selected_warehouse_id is None:
             warehouses = self.session.query(Warehouse).all()
         else:
@@ -321,15 +321,15 @@ class WarehouseWidget(QWidget):
 
         elements = []
 
-        # Стили для текста и таблиц
+        
         styles = getSampleStyleSheet()
         title_style = styles['Heading2']
         title_style.fontName = 'SegoeUIRegular'
         title_style.fontSize = 14
         title_style.leading = 16
-        title_style.alignment = 1  # Центрирование
+        title_style.alignment = 1  
 
-        # Проверяем наличие данных
+        
         has_data = False
         for warehouse in warehouses:
             products = self.session.query(ProductOnWarehouse).filter_by(id_склада=warehouse.id).all()
@@ -341,25 +341,21 @@ class WarehouseWidget(QWidget):
             QMessageBox.warning(self, "Предупреждение", "На выбранном складе(ах) нет продукции для отчёта!")
             return
 
-        # Для каждого склада создаём "карточку"
         for warehouse in warehouses:
             products = self.session.query(ProductOnWarehouse).filter_by(id_склада=warehouse.id).all()
             if not products:
-                continue  # Пропускаем склады без продукции
+                continue
 
-            # Заголовок склада
             warehouse_name = warehouse.Название if warehouse and warehouse.Название else "Не указан"
             elements.append(Paragraph(f"Склад: {warehouse_name}", title_style))
             elements.append(Spacer(1, 0.2 * cm))
 
-            # Данные для таблицы
             data = [["Продукция", "Количество"]]
             for product_stock in products:
                 product_name = product_stock.продукция.Наименование if product_stock.продукция else "Не указан"
                 quantity = product_stock.Количество if product_stock.Количество is not None else "Не указано"
                 data.append([product_name, str(quantity)])
 
-            # Создаём таблицу
             table = Table(data, colWidths=[10 * cm, 4 * cm])
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -371,16 +367,15 @@ class WarehouseWidget(QWidget):
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.white),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('BOX', (0, 0), (-1, -1), 1, colors.black),  # Граница вокруг таблицы
+                ('BOX', (0, 0), (-1, -1), 1, colors.black),
                 ('LEFTPADDING', (0, 0), (-1, -1), 6),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 6),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ]))
             elements.append(table)
-            elements.append(Spacer(1, 0.5 * cm))  # Отступ после таблицы
+            elements.append(Spacer(1, 0.5 * cm))
 
-        # Создаём PDF
         pdf_file = "stock_report.pdf"
         doc = SimpleDocTemplate(pdf_file, pagesize=A4)
         doc.build(elements)

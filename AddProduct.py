@@ -1,4 +1,3 @@
-# AddProduct.py
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QPushButton, QComboBox, QMessageBox, QTextEdit
 from datebase import Product, ProductType
 from styles import DIALOG_STYLE

@@ -1,4 +1,4 @@
-# MainScreenWindow.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QFrame, QLabel, QMessageBox, QHBoxLayout
 )
@@ -50,7 +50,7 @@ class OrderCard(QFrame):
         )
         if reply == QMessageBox.Yes:
             try:
-                self.order.id_сотрудник = 1  # Placeholder: Замените на реальный ID сотрудника
+                self.order.id_сотрудник = 1  
                 self.order.Статус = "Принят"
                 self.session.commit()
                 self.parent_widget.load_cards()
@@ -69,12 +69,12 @@ class MainScreenWidget(QWidget):
     def setup_ui(self):
         self.layout = QVBoxLayout(self)
 
-        # Заголовок
+        
         self.title_label = QLabel("Ожидающие принятия заказы")
         self.title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.layout.addWidget(self.title_label)
 
-        # Создаем область прокрутки для карточек
+        
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("QScrollArea { border: none; }")
@@ -92,14 +92,14 @@ class MainScreenWidget(QWidget):
         self.setStyleSheet(TABLE_WIDGET_STYLE)
 
     def load_cards(self):
-        # Очищаем текущие карточки
+        
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
         self.selected_card = None
 
-        # Загружаем заказы, где сотрудник не указан и статус не "Отменён"
+        
         orders = self.session.query(Order).filter(
             Order.id_сотрудник == None,
             Order.Статус != "Отменён"

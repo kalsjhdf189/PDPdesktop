@@ -1,4 +1,3 @@
-# main.py
 import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QSizePolicy, QHeaderView, QLabel, QMessageBox
@@ -30,30 +29,27 @@ class MainWindow(QMainWindow):
         self.product_stock_widget = None
         self.main_screen_widget = None
         self.partner_widget = None
-        self.from_warehouse = False  # Флаг для отслеживания перехода из "Склады"
+        self.from_warehouse = False  
         self.session = Connect.create_connection()
-        self.last_order_id = self.get_last_order_id()  # Последний известный ID заказа
+        self.last_order_id = self.get_last_order_id()  
         self.setup_ui()
         self.setup_order_check_timer()
 
     def setup_ui(self):
         self.main_widget = QWidget()
-        self.main_layout = QHBoxLayout(self.main_widget)  # Основной горизонтальный layout
+        self.main_layout = QHBoxLayout(self.main_widget)  
 
-        # Боковая панель
         self.sidebar_widget = QWidget()
         self.sidebar_widget.setFixedWidth(200)
         self.sidebar_layout = QVBoxLayout(self.sidebar_widget)
         self.sidebar_layout.setSpacing(10)
         self.sidebar_layout.setContentsMargins(10, 10, 10, 10)
 
-        # Логотип
         self.logo_label = QLabel()
         self.logo_label.setPixmap(QPixmap("images/logo.png").scaled(180, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.logo_label.setAlignment(Qt.AlignCenter)
         self.sidebar_layout.addWidget(self.logo_label)
 
-        # Кнопки боковой панели
         self.show_products_btn = QPushButton("Продукция")
         self.show_products_btn.setStyleSheet(SIDEBAR_BUTTON_STYLE)
         self.show_products_btn.clicked.connect(self.toggle_product_table)
@@ -66,7 +62,7 @@ class MainWindow(QMainWindow):
         self.show_warehouses_btn.setStyleSheet(SIDEBAR_BUTTON_STYLE)
         self.show_warehouses_btn.clicked.connect(self.toggle_warehouse_table)
 
-        self.show_partners_btn = QPushButton("Партнёры")
+        self.show_partners_btn = QPushButton("Клиенты")
         self.show_partners_btn.setStyleSheet(SIDEBAR_BUTTON_STYLE)
         self.show_partners_btn.clicked.connect(self.toggle_partner_table)
 
@@ -76,20 +72,17 @@ class MainWindow(QMainWindow):
         self.sidebar_layout.addWidget(self.show_partners_btn)
         self.sidebar_layout.addStretch()
 
-        # Контентная область
         self.content_container = QWidget()
         self.content_layout = QVBoxLayout(self.content_container)
 
-        # Верхняя панель с кнопкой закрытия
         self.header_layout = QHBoxLayout()
         
-        # Новая кнопка "backward.svg" для возврата к "Склады"
         self.back_to_warehouse_btn = QPushButton()
         self.back_to_warehouse_btn.setIcon(QIcon("images/backward.svg"))
         self.back_to_warehouse_btn.setStyleSheet(ICON_BUTTON_STYLE)
         self.back_to_warehouse_btn.setFixedSize(40, 40)
         self.back_to_warehouse_btn.clicked.connect(self.return_to_warehouses)
-        self.back_to_warehouse_btn.setVisible(False)  # Изначально скрыта
+        self.back_to_warehouse_btn.setVisible(False)  
         self.header_layout.addWidget(self.back_to_warehouse_btn)
         
         self.close_btn = QPushButton()
@@ -97,49 +90,42 @@ class MainWindow(QMainWindow):
         self.close_btn.setStyleSheet(ICON_BUTTON_STYLE)
         self.close_btn.setFixedSize(40, 40)
         self.close_btn.clicked.connect(self.close_current_widget)
-        self.close_btn.setVisible(False)  # Изначально кнопка скрыта
+        self.close_btn.setVisible(False)  
         self.header_layout.addStretch()
         self.header_layout.addWidget(self.close_btn)
 
-        # Область для виджетов
         self.content_area = QWidget()
         self.content_area_layout = QVBoxLayout(self.content_area)
 
         self.content_layout.addLayout(self.header_layout)
         self.content_layout.addWidget(self.content_area)
 
-        # Добавление боковой панели и контентной области в основной layout
         self.main_layout.addWidget(self.sidebar_widget)
         self.main_layout.addWidget(self.content_container)
 
         self.setCentralWidget(self.main_widget)
         self.setStyleSheet(MAIN_WINDOW_STYLE)
 
-        # Показываем главный экран по умолчанию
         self.show_main_screen()
 
     def setup_order_check_timer(self):
-        # Таймер для проверки новых заказов каждые 10 секунд
         self.order_check_timer = QTimer(self)
         self.order_check_timer.timeout.connect(self.check_new_orders)
-        self.order_check_timer.start(10000)  # 10 секунд
+        self.order_check_timer.start(10000)  
 
     def get_last_order_id(self):
-        # Получаем ID последнего заказа в БД
         last_order = self.session.query(Order).order_by(Order.id.desc()).first()
         return last_order.id if last_order else 0
 
     def check_new_orders(self):
-        # Проверяем, есть ли заказы с ID больше последнего известного
         new_orders = self.session.query(Order).filter(Order.id > self.last_order_id).all()
         if new_orders:
-            self.last_order_id = max(order.id for order in new_orders)  # Обновляем последний ID
+            self.last_order_id = max(order.id for order in new_orders)  
             QMessageBox.information(
                 self,
                 "Новый заказ",
                 f"Поступило {len(new_orders)} новых заказов!"
             )
-            # Если на главном экране, обновляем карточки
             if self.main_screen_widget is not None:
                 self.main_screen_widget.load_cards()
 
@@ -149,7 +135,8 @@ class MainWindow(QMainWindow):
             self.main_screen_widget = MainScreenWidget(self)
             self.content_area_layout.addWidget(self.main_screen_widget)
             self.reset_other_buttons("main")
-            self.close_btn.setVisible(False)  # Скрываем кнопку закрытия на главном экране
+            self.close_btn.setVisible(False)  
+            self.back_to_warehouse_btn.setVisible(False)  
 
     def toggle_product_table(self):
         if self.product_widget is None:
@@ -158,9 +145,9 @@ class MainWindow(QMainWindow):
             self.content_area_layout.addWidget(self.product_widget)
             self.show_products_btn.setStyleSheet(SIDEBAR_BUTTON_ACTIVE_STYLE)
             self.reset_other_buttons("product")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.from_warehouse = False
-        # Если виджет уже открыт, ничего не делаем
+            self.back_to_warehouse_btn.setVisible(False)  
 
     def toggle_invoice_table(self):
         if self.invoice_widget is None:
@@ -168,10 +155,11 @@ class MainWindow(QMainWindow):
             self.invoice_widget = IncomingInvoiceWidget(self)
             self.content_area_layout.addWidget(self.invoice_widget)
             self.reset_other_buttons("invoice")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.back_to_warehouse_btn.setVisible(self.from_warehouse)
         else:
-            self.close_current_widget()
+            self.clear_content_area()
+            self.show_main_screen()
 
     def toggle_order_table(self):
         if self.order_widget is None:
@@ -180,9 +168,9 @@ class MainWindow(QMainWindow):
             self.content_area_layout.addWidget(self.order_widget)
             self.show_orders_btn.setStyleSheet(SIDEBAR_BUTTON_ACTIVE_STYLE)
             self.reset_other_buttons("order")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.from_warehouse = False
-        # Если виджет уже открыт, ничего не делаем
+            self.back_to_warehouse_btn.setVisible(False)  
 
     def toggle_warehouse_table(self):
         if self.warehouse_widget is None:
@@ -191,9 +179,9 @@ class MainWindow(QMainWindow):
             self.content_area_layout.addWidget(self.warehouse_widget)
             self.show_warehouses_btn.setStyleSheet(SIDEBAR_BUTTON_ACTIVE_STYLE)
             self.reset_other_buttons("warehouse")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.from_warehouse = False
-        # Если виджет уже открыт, ничего не делаем
+            self.back_to_warehouse_btn.setVisible(False)  
 
     def toggle_movement_table(self):
         if self.movement_widget is None:
@@ -201,10 +189,11 @@ class MainWindow(QMainWindow):
             self.movement_widget = MovementWidget(self)
             self.content_area_layout.addWidget(self.movement_widget)
             self.reset_other_buttons("movement")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.back_to_warehouse_btn.setVisible(self.from_warehouse)
         else:
-            self.close_current_widget()
+            self.clear_content_area()
+            self.show_main_screen()
 
     def toggle_product_stock_table(self):
         if self.product_stock_widget is None:
@@ -212,10 +201,11 @@ class MainWindow(QMainWindow):
             self.product_stock_widget = ProductOnWarehouseWidget(self)
             self.content_area_layout.addWidget(self.product_stock_widget)
             self.reset_other_buttons("product_stock")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.back_to_warehouse_btn.setVisible(self.from_warehouse)
         else:
-            self.close_current_widget()
+            self.clear_content_area()
+            self.show_main_screen()
 
     def toggle_partner_table(self):
         if self.partner_widget is None:
@@ -224,9 +214,9 @@ class MainWindow(QMainWindow):
             self.content_area_layout.addWidget(self.partner_widget)
             self.show_partners_btn.setStyleSheet(SIDEBAR_BUTTON_ACTIVE_STYLE)
             self.reset_other_buttons("partner")
-            self.close_btn.setVisible(True)  # Показываем кнопку закрытия
+            self.close_btn.setVisible(True)  
             self.from_warehouse = False
-        # Если виджет уже открыт, ничего не делаем
+            self.back_to_warehouse_btn.setVisible(False)  
 
     def clear_content_area(self):
         if self.product_widget is not None:
@@ -265,6 +255,7 @@ class MainWindow(QMainWindow):
             self.partner_widget.deleteLater()
             self.partner_widget = None
             self.show_partners_btn.setStyleSheet(SIDEBAR_BUTTON_STYLE)
+        self.back_to_warehouse_btn.setVisible(False)  
 
     def reset_other_buttons(self, active_section):
         if active_section != "product":
@@ -278,7 +269,7 @@ class MainWindow(QMainWindow):
 
     def close_current_widget(self):
         self.clear_content_area()
-        self.show_main_screen()  # Возвращаемся на главный экран
+        self.show_main_screen()  
         self.close_btn.setVisible(False)
         self.back_to_warehouse_btn.setVisible(False)
 

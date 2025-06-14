@@ -1,4 +1,4 @@
-# ProductOnWarehouseWindow.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QScrollArea, QFrame, QLabel, QMessageBox
 )
@@ -27,14 +27,14 @@ class ProductOnWarehouseCard(QFrame):
         self.products = products
         self.session = session
 
-        # Основной вертикальный layout карточки
+        
         layout = QVBoxLayout()
 
-        # Название склада
+        
         warehouse_name = warehouse.Название if warehouse and warehouse.Название else "Не указан"
         layout.addWidget(QLabel(f"<b>Склад: {warehouse_name}</b>"))
 
-        # Список продукции
+        
         if not products:
             layout.addWidget(QLabel("Продукция отсутствует"))
         else:
@@ -54,7 +54,7 @@ class ProductOnWarehouseWidget(QWidget):
     def setup_ui(self):
         self.layout = QVBoxLayout(self)
 
-        # Создаем область прокрутки для карточек
+        
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("QScrollArea { border: none; }")
@@ -72,27 +72,27 @@ class ProductOnWarehouseWidget(QWidget):
         self.setStyleSheet(TABLE_WIDGET_STYLE)
 
     def load_cards(self):
-        # Очищаем текущие карточки
+        
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
 
-        # Получаем все склады
+        
         warehouses = self.session.query(Warehouse).all()
 
-        # Для каждого склада получаем список продукции
+        
         for warehouse in warehouses:
             products = self.session.query(ProductOnWarehouse).filter_by(id_склада=warehouse.id).all()
-            if products:  # Создаём карточку только для складов с продукцией
+            if products:  
                 card = ProductOnWarehouseCard(warehouse, products, self.session)
                 self.cards_layout.addWidget(card)
 
     def return_to_warehouses(self):
-        # Возвращаемся к разделу "Склады"
+        
         main_window = get_main_window(self)
         if main_window is None:
             QMessageBox.critical(self, "Ошибка", "Не удалось найти главное окно приложения")
             return
-        main_window.from_warehouse = False  # Сбрасываем флаг
+        main_window.from_warehouse = False  
         main_window.toggle_warehouse_table()

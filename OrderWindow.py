@@ -1,45 +1,58 @@
-# OrderWindow.py
 from PySide6.QtWidgets import (
     QWidget, QTableWidget, QVBoxLayout, QTableWidgetItem, QPushButton, QHBoxLayout, 
-    QDialog, QFormLayout, QComboBox, QLineEdit, QDateEdit, QMessageBox, QSizePolicy, 
-    QHeaderView, QLabel, QScrollArea, QFrame, QTextEdit
+    QDialog, QFormLayout, QComboBox, QLineEdit, QDateTimeEdit, QMessageBox, QSizePolicy, 
+    QHeaderView, QLabel, QScrollArea, QFrame, QTextEdit, QFileDialog
 )
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtGui import QIcon
-from datebase import ProductOnWarehouse, OrderProduct, Product, Order, Employee, Partner, Delivery, Payment, Delivery_method, Connect, LegalAddress
+from datebase import ProductOnWarehouse, OrderProduct, Product, Order, Employee, Partner, Delivery, Payment, Delivery_method, Connect, LegalAddress, OrderAttachment
 from styles import TABLE_WIDGET_STYLE, DIALOG_STYLE, ICON_BUTTON_STYLE, CARD_STYLE
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from datetime import datetime
+import os
 
 class OrderProductsDialog(QDialog):
     def __init__(self, session, order, parent=None):
         super().__init__(parent)
         self.session = session
         self.order = order
+        self.attached_file_path = None
         self.setWindowTitle(f"Продукция заказа #{order.id}")
         self.setGeometry(100,100,400,200)
         self.setup_ui()
+        self.load_attachment()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         info_label = QLabel(f"ID заказа: {self.order.id}\nДата создания: {self.order.Дата_создания}")
         layout.addWidget(info_label)
 
+        content_layout = QHBoxLayout()
+
         self.table = QTableWidget()
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        layout.addWidget(self.table)
+        content_layout.addWidget(self.table)
+
+        self.attach_file_btn = QPushButton("Прикрепить файл")
+        self.attach_file_btn.clicked.connect(self.attach_file)
+        content_layout.addWidget(self.attach_file_btn)
+
+        layout.addLayout(content_layout)
 
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton("Добавить продукцию")
+        self.add_btn.setEnabled(False)
+        self.add_btn.setStyleSheet("background-color: gray; color: white;")
         self.add_btn.clicked.connect(self.add_order_product)
         self.closeASIS = QPushButton("Закрыть")
-        self.closeASIS.clicked.connect(self.accept)
+        self.closeASIS.clicked.connect(self.reject)
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.closeASIS)
         layout.addLayout(btn_layout)
@@ -47,6 +60,45 @@ class OrderProductsDialog(QDialog):
         self.load_table_data()
         self.setStyleSheet(DIALOG_STYLE)
 
+    def load_attachment(self):
+        attachment = self.session.query(OrderAttachment).filter(OrderAttachment.order_id == self.order.id).first()
+        if attachment:
+            self.attached_file_path = attachment.file_path
+            file_name = os.path.basename(self.attached_file_path)
+            self.attach_file_btn.setText(file_name)
+            self.add_btn.setEnabled(True)
+            self.add_btn.setStyleSheet("")
+        else:
+            self.attached_file_path = None
+            self.attach_file_btn.setText("Прикрепить файл")
+            self.add_btn.setEnabled(False)
+            self.add_btn.setStyleSheet("background-color: gray; color: white;")
+
+    def attach_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Выберите файл", "", "Все файлы (*);;Текстовые файлы (*.txt);;PDF файлы (*.pdf)"
+        )
+        if file_path:
+            self.attached_file_path = file_path
+            file_name = os.path.basename(file_path)
+            self.attach_file_btn.setText(file_name)
+            self.add_btn.setEnabled(True)
+            self.add_btn.setStyleSheet("")
+            attachment = self.session.query(OrderAttachment).filter(OrderAttachment.order_id == self.order.id).first()
+            if attachment:
+                attachment.file_path = file_path
+            else:
+                new_attachment = OrderAttachment(order_id=self.order.id, file_path=file_path)
+                self.session.add(new_attachment)
+            self.session.commit()
+            QMessageBox.information(self, "Успех", f"Файл прикреплен: {file_name}")
+        elif not self.attached_file_path:
+            self.attached_file_path = None
+            self.attach_file_btn.setText("Прикрепить файл")
+            self.add_btn.setEnabled(False)
+            self.add_btn.setStyleSheet("background-color: gray; color: white;")
+            QMessageBox.warning(self, "Предупреждение", "Файл не был выбран.")
+            
     def load_table_data(self):
         order_products = self.session.query(OrderProduct).filter(OrderProduct.id_заказа == self.order.id).all()
         columns = ["Наименование", "Количество", "Стоимость"]
@@ -61,6 +113,9 @@ class OrderProductsDialog(QDialog):
             self.table.setItem(row, 2, QTableWidgetItem(str(order_product.Стоимость or "0.0")))
 
     def add_order_product(self):
+        if not self.attached_file_path:
+            QMessageBox.warning(self, "Ошибка", "Необходимо прикрепить файл перед добавлением продукции!")
+            return
         dialog = AddOrderProductDialog(self.session, self.order, self)
         if dialog.exec() == QDialog.Accepted:
             self.load_table_data()
@@ -148,6 +203,7 @@ class AddOrderProductDialog(QDialog):
         products = self.session.query(Product).all()
         for product in products:
             self.product_combo.addItem(product.Наименование, product.id)
+        self.product_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         layout.addRow("Продукция:", self.product_combo)
 
         self.quantity_edit = QLineEdit()
@@ -156,10 +212,9 @@ class AddOrderProductDialog(QDialog):
 
         self.cost_edit = QLineEdit()
         self.cost_edit.setPlaceholderText("Стоимость рассчитывается автоматически")
-        self.cost_edit.setReadOnly(True)  # Нередактируемое поле
+        self.cost_edit.setReadOnly(True)
         layout.addRow("Стоимость:", self.cost_edit)
 
-        # Подключаем сигналы для динамического обновления стоимости
         self.product_combo.currentIndexChanged.connect(self.update_cost)
         self.quantity_edit.textChanged.connect(self.update_cost)
 
@@ -168,10 +223,9 @@ class AddOrderProductDialog(QDialog):
         layout.addWidget(self.save_btn)
 
         self.setStyleSheet(DIALOG_STYLE)
-        self.update_cost()  # Инициализируем стоимость при открытии
+        self.update_cost()
 
     def update_cost(self):
-        """Обновляет поле стоимости на основе выбранной продукции и количества."""
         try:
             product_id = self.product_combo.currentData()
             quantity = int(self.quantity_edit.text()) if self.quantity_edit.text().strip() else 0
@@ -196,12 +250,10 @@ class AddOrderProductDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", f"Некорректные данные: {str(e)}")
             return
 
-        # Рассчитываем стоимость
         product = self.session.query(Product).filter(Product.id == product_id).first()
         price = product.Стоимость if product and product.Стоимость is not None else 0.0
         cost = price * quantity
 
-        # Проверяем существующую запись OrderProduct
         existing_product = self.session.query(OrderProduct).filter(
             OrderProduct.id_заказа == self.order.id,
             OrderProduct.id_продукции == product_id
@@ -219,22 +271,19 @@ class AddOrderProductDialog(QDialog):
             )
             self.session.add(new_order_product)
 
-        # Обновляем или создаём Payment
         payment = self.session.query(Payment).filter(Payment.id == self.order.id_оплата).first()
         if payment:
-            # Рассчитываем сумму как сумму всех OrderProduct.Стоимость для заказа
             order_products = self.session.query(OrderProduct).filter(OrderProduct.id_заказа == self.order.id).all()
             total_amount = sum(op.Стоимость or 0.0 for op in order_products)
             payment.Сумма = total_amount
         else:
-            # Создаём новую оплату, если не существует
             new_payment = Payment(
-                Дата_оплаты=QDate.currentDate().toPython(),
+                Дата_оплаты=QDateTime.currentDateTime().toPython(),
                 Статус="Ожидает",
                 Сумма=cost
             )
             self.session.add(new_payment)
-            self.session.flush()  # Получаем ID новой оплаты
+            self.session.flush()
             self.order.id_оплата = new_payment.id
 
         self.session.commit()
@@ -255,6 +304,7 @@ class AddOrderDialog(QDialog):
         employees = self.session.query(Employee).all()
         for emp in employees:
             self.employee_combo.addItem(f"{emp.Фамилия} {emp.Имя[0]}. {emp.Отчество[0]}.", emp.id)
+        self.employee_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         if self.order:
             self.employee_combo.setCurrentIndex(self.employee_combo.findData(self.order.id_сотрудник))
         layout.addRow("Сотрудник:", self.employee_combo)
@@ -263,18 +313,31 @@ class AddOrderDialog(QDialog):
         partners = self.session.query(Partner).all()
         for partner in partners:
             self.partner_combo.addItem(partner.Наименование, partner.id)
+        self.partner_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         if self.order:
             self.partner_combo.setCurrentIndex(self.partner_combo.findData(self.order.id_партнер))
-        layout.addRow("Партнёр:", self.partner_combo)
+        layout.addRow("Клиент:", self.partner_combo)
 
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)  # Enable calendar popup
-        self.date_edit.setDate(QDate.fromString(str(self.order.Дата_создания), "yyyy-MM-dd") if self.order else QDate.currentDate())
-        self.date_edit.setDisplayFormat("yyyy-MM-dd")
-        layout.addRow("Дата создания:", self.date_edit)
+        self.datetime_edit = QDateTimeEdit()
+        self.datetime_edit.setCalendarPopup(True)
+        self.datetime_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        if self.order and self.order.Дата_создания:
+            try:
+                order_datetime = self.order.Дата_создания
+                if isinstance(order_datetime, datetime):
+                    self.datetime_edit.setDateTime(QDateTime(order_datetime))
+                else:
+                    order_datetime = datetime.strptime(str(order_datetime), "%Y-%m-%d %H:%M:%S")
+                    self.datetime_edit.setDateTime(QDateTime(order_datetime))
+            except (ValueError):
+                self.datetime_edit.setDateTime(QDateTime.currentDateTime())
+        else:
+            self.datetime_edit.setDateTime(QDateTime.currentDateTime())
+        layout.addRow("Дата и время создания:", self.datetime_edit)
 
         self.status_combo = QComboBox()
         self.status_combo.addItems(["В обработке", "Принят", "Согласован", "В пути", "Завершён", "Отменён"])
+        self.status_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         if self.order:
             self.status_combo.setCurrentText(self.order.Статус)
         layout.addRow("Статус:", self.status_combo)
@@ -284,6 +347,7 @@ class AddOrderDialog(QDialog):
         for delivery in delivery_methods:
             method_name = delivery.способ_доставки.Наименование if delivery.способ_доставки else "Не указан"
             self.delivery_combo.addItem(f"Доставка #{delivery.id} ({method_name})", delivery.id)
+        self.delivery_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         if self.order:
             self.delivery_combo.setCurrentIndex(self.delivery_combo.findData(self.order.id_доставка))
         layout.addRow("Доставка:", self.delivery_combo)
@@ -292,6 +356,7 @@ class AddOrderDialog(QDialog):
         payments = self.session.query(Payment).all()
         for payment in payments:
             self.payment_combo.addItem(f"Оплата #{payment.id} ({payment.Сумма})", payment.id)
+        self.payment_combo.setStyleSheet(TABLE_WIDGET_STYLE)
         if self.order:
             self.payment_combo.setCurrentIndex(self.payment_combo.findData(self.order.id_оплата))
         layout.addRow("Оплата:", self.payment_combo)
@@ -313,6 +378,10 @@ class AddOrderDialog(QDialog):
             self.view_delivery_btn.clicked.connect(self.view_delivery)
             layout.addWidget(self.view_delivery_btn)
 
+            self.report_btn = QPushButton("Сформировать отчёт")
+            self.report_btn.clicked.connect(self.generate_order_report)
+            layout.addWidget(self.report_btn)
+
         self.save_btn = QPushButton("Сохранить")
         self.save_btn.clicked.connect(self.save_order)
         layout.addWidget(self.save_btn)
@@ -331,25 +400,74 @@ class AddOrderDialog(QDialog):
         dialog = DeliveryDialog(self.session, self.order, self)
         dialog.exec()
 
+    def generate_order_report(self):
+        pdfmetrics.registerFont(TTFont('SegoeUI', 'C:/Windows/Fonts/SegoeUI.ttf'))
+        order = self.order
+        if not order:
+            QMessageBox.warning(self, "Ошибка", "Заказ не найден!")
+            return
+
+        order_products = self.session.query(OrderProduct).filter(OrderProduct.id_заказа == order.id).all()
+        if not order_products:
+            QMessageBox.warning(self, "Предупреждение", "В заказе нет продукции для отчёта!")
+            return
+
+        pdf_file = f"order_report_{order.id}.pdf"
+        doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+        elements = []
+        styles = getSampleStyleSheet()
+        style = styles['Normal']
+        style.fontName = 'SegoeUI'
+        style.fontSize = 14
+
+        elements.append(Paragraph(f"Заказ #{order.id}", style))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph(f"Клиент: {order.партнер.Наименование}", style))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph(f"Дата создания: {order.Дата_создания}", style))
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("<br/><br/>", style))
+
+        data = [["Продукция", "Количество", "Стоимость"]]
+        for op in order_products:
+            product = self.session.query(Product).filter(Product.id == op.id_продукции).first()
+            product_name = product.Наименование if product else "Не указан"
+            data.append([product_name, op.Количество, op.Стоимость or "0.0"])
+
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, -1), 'SegoeUI'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('FONTSIZE', (0, 1), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+
+        elements.append(table)
+        doc.build(elements)
+        QMessageBox.information(self, "Успех", f"Отчет по заказу #{order.id} успешно сохранён как {pdf_file}!")
+
     def save_order(self):
         new_status = self.status_combo.currentText()
         old_status = self.order.Статус if self.order else None
 
         if self.order:
-            # Обновление существующего заказа
             self.order.id_сотрудник = self.employee_combo.currentData()
             self.order.id_партнер = self.partner_combo.currentData()
-            self.order.Дата_создания = self.date_edit.date().toPython()
+            self.order.Дата_создания = self.datetime_edit.dateTime().toPython()
             self.order.Статус = new_status
             self.order.id_доставка = self.delivery_combo.currentData()
             self.order.id_оплата = self.payment_combo.currentData()
             self.order.Комментарий = self.comment_edit.toPlainText().strip() or None
         else:
-            # Создание нового заказа
             new_order = Order(
                 id_сотрудник=self.employee_combo.currentData(),
                 id_партнер=self.partner_combo.currentData(),
-                Дата_создания=self.date_edit.date().toPython(),
+                Дата_создания=self.datetime_edit.dateTime().toPython(),
                 Статус=new_status,
                 id_доставка=self.delivery_combo.currentData(),
                 id_оплата=self.payment_combo.currentData(),
@@ -357,10 +475,9 @@ class AddOrderDialog(QDialog):
             )
             self.session.add(new_order)
 
-        # Обновляем Payment.Сумма
         order_id = self.order.id if self.order else None
         if not order_id:
-            self.session.flush()  # Получаем ID нового заказа
+            self.session.flush()
             order_id = new_order.id
 
         payment = self.session.query(Payment).filter(Payment.id == self.payment_combo.currentData()).first()
@@ -369,9 +486,8 @@ class AddOrderDialog(QDialog):
             total_amount = sum(op.Стоимость or 0.0 for op in order_products)
             payment.Сумма = total_amount
         else:
-            # Если оплаты нет, создаём новую с нулевой суммой
             new_payment = Payment(
-                Дата_оплаты=QDate.currentDate().toPython(),
+                Дата_оплаты=QDateTime.currentDateTime().toPython(),
                 Статус="Ожидает",
                 Сумма=0.0
             )
@@ -382,7 +498,6 @@ class AddOrderDialog(QDialog):
             else:
                 new_order.id_оплата = new_payment.id
 
-        # Проверка при статусе "Завершён"
         if new_status == "Согласован" and old_status != "Согласован":
             order_products = self.session.query(OrderProduct).filter(OrderProduct.id_заказа == order_id).all()
             for order_product in order_products:
@@ -429,7 +544,7 @@ class OrderCard(QFrame):
         partner_name = self.order.партнер.Наименование if self.order.партнер else "Не указан"
         payment = self.session.query(Payment).filter(Payment.id == self.order.id_оплата).first()
         total_amount = payment.Сумма if payment else "0.0"
-        left_layout.addWidget(QLabel(f"Партнёр: {partner_name}"))
+        left_layout.addWidget(QLabel(f"Клиент: {partner_name}"))
         left_layout.addWidget(QLabel(f"Дата создания: {self.order.Дата_создания}"))
         left_layout.addWidget(QLabel(f"Общая сумма: {total_amount}"))
 
@@ -474,26 +589,38 @@ class OrderWidget(QWidget):
         self.layout = QVBoxLayout(self)
         self.btnLayout = QHBoxLayout()
 
-        # Date filter inputs
         self.date_filter_layout = QHBoxLayout()
-        self.from_date = QDateEdit()
-        self.from_date.setCalendarPopup(True)  # Enable calendar popup
-        self.from_date.setDisplayFormat("yyyy-MM-dd")
-        self.from_date.setDate(QDate.currentDate().addMonths(-1))
-        self.to_date = QDateEdit()
-        self.to_date.setCalendarPopup(True)  # Enable calendar popup
-        self.to_date.setDisplayFormat("yyyy-MM-dd")
-        self.to_date.setDate(QDate.currentDate())
+        self.from_date = QDateTimeEdit()
+        self.from_date.setCalendarPopup(True)
+        self.from_date.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self.from_date.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+        self.from_date.dateTimeChanged.connect(self.load_cards)
+
+        self.to_date = QDateTimeEdit()
+        self.to_date.setCalendarPopup(True)
+        self.to_date.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+        self.to_date.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+        self.to_date.dateTimeChanged.connect(self.load_cards)
         
-        self.filter_btn = QPushButton("Фильтровать")
-        self.filter_btn.setStyleSheet(TABLE_WIDGET_STYLE)
-        self.filter_btn.clicked.connect(self.load_cards)
+        self.partner_combo = QComboBox()
+        self.partner_combo.addItem("Все клиенты", 0)
+        partners = self.session.query(Partner).all()
+        for partner in partners:
+            self.partner_combo.addItem(partner.Наименование, partner.id)
+        self.partner_combo.setStyleSheet(TABLE_WIDGET_STYLE)
+        self.partner_combo.currentIndexChanged.connect(self.load_cards)
+        
+        self.reset_btn = QPushButton("Сбросить")
+        self.reset_btn.setStyleSheet(TABLE_WIDGET_STYLE)
+        self.reset_btn.clicked.connect(self.reset_filters)
         
         self.date_filter_layout.addWidget(QLabel("От:"))
         self.date_filter_layout.addWidget(self.from_date)
         self.date_filter_layout.addWidget(QLabel("До:"))
         self.date_filter_layout.addWidget(self.to_date)
-        self.date_filter_layout.addWidget(self.filter_btn)
+        self.date_filter_layout.addWidget(QLabel("Клиент:"))
+        self.date_filter_layout.addWidget(self.partner_combo)
+        self.date_filter_layout.addWidget(self.reset_btn)
         self.date_filter_layout.addStretch()
 
         self.addBtn = QPushButton()
@@ -511,7 +638,7 @@ class OrderWidget(QWidget):
         self.report_btn = QPushButton()
         self.report_btn.setIcon(QIcon("images/report.svg"))
         self.report_btn.setStyleSheet(ICON_BUTTON_STYLE)
-        self.report_btn.clicked.connect(self.select_order_for_report)
+        self.report_btn.clicked.connect(self.generate_orders_report)
 
         self.btnLayout.addWidget(self.addBtn)
         self.btnLayout.addWidget(self.deleteBtn)
@@ -537,6 +664,15 @@ class OrderWidget(QWidget):
         self.load_cards()
         self.setStyleSheet(TABLE_WIDGET_STYLE)
 
+    def reset_filters(self):
+        """Сбрасывает все фильтры и загружает все заказы."""
+        self.from_date.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+        self.from_date.setStyleSheet(TABLE_WIDGET_STYLE)
+        self.to_date.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+        self.from_date.setStyleSheet(TABLE_WIDGET_STYLE)
+        self.partner_combo.setCurrentIndex(0)
+        self.load_cards()
+
     def load_cards(self):
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
@@ -544,14 +680,21 @@ class OrderWidget(QWidget):
                 widget.deleteLater()
         self.selected_card = None
 
-        # Apply date filtering
-        from_date = self.from_date.date().toPython()
-        to_date = self.to_date.date().toPython()
+        from_date = self.from_date.dateTime().toPython()
+        to_date = self.to_date.dateTime().toPython()
+        partner_id = self.partner_combo.currentData()
+        placeholder_date = datetime(2000, 1, 1, 0, 0, 0)
+
+        query = self.session.query(Order)
+        if from_date != placeholder_date or to_date != placeholder_date:
+            query = query.filter(
+                Order.Дата_создания >= from_date,
+                Order.Дата_создания <= to_date
+            )
+        if partner_id != 0:
+            query = query.filter(Order.id_партнер == partner_id)
         
-        orders = self.session.query(Order).filter(
-            Order.Дата_создания >= from_date,
-            Order.Дата_создания <= to_date
-        ).all()
+        orders = query.all()
 
         for order in orders:
             card = OrderCard(order, self, self.session)
@@ -587,65 +730,68 @@ class OrderWidget(QWidget):
         reply = QMessageBox.question(self, "Подтверждение", "Вы уверены, что хотите удалить этот заказ?",
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
+            self.deleteBtn.setEnabled(False)
             self.session.delete(order)
             self.session.commit()
             self.load_cards()
+            self.deleteBtn.setEnabled(True)
             QMessageBox.information(self, "Успех", "Заказ успешно удалён!")
-            
-    def select_order_for_report(self):
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Выбор заказа для отчёта")
-        layout = QVBoxLayout(dialog)
 
-        combo = QComboBox()
-        orders = self.session.query(Order).all()
-        for order in orders:
-            combo.addItem(f"Заказ #{order.id} от {order.Дата_создания}", order.id)
+    def generate_orders_report(self):
+        pdfmetrics.registerFont(TTFont('SegoeUI', 'C:/Windows/Fonts/SegoeUI.ttf'))
+        from_date = self.from_date.dateTime().toPython()
+        to_date = self.to_date.dateTime().toPython()
+        partner_id = self.partner_combo.currentData()
+        placeholder_date = datetime(2000, 1, 1, 0, 0, 0)
 
-        ok_btn = QPushButton("Сформировать отчёт")
-        ok_btn.clicked.connect(lambda: self.generate_order_report(combo.currentData(), dialog))
-        layout.addWidget(combo)
-        layout.addWidget(ok_btn)
-
-        dialog.exec()
-    
-    def generate_order_report(self, order_id, dialog):
-        dialog.accept()
-        pdfmetrics.registerFont(TTFont('SegoeUIRegular', 'C:/Windows/Fonts/SegoeUI.ttf'))
-        order = self.session.query(Order).filter(Order.id == order_id).first()
-        if not order:
-            QMessageBox.warning(self, "Ошибка", "Заказ не найден!")
+        query = self.session.query(Order)
+        if from_date != placeholder_date or to_date != placeholder_date:
+            query = query.filter(
+                Order.Дата_создания >= from_date,
+                Order.Дата_создания <= to_date
+            )
+        if partner_id != 0:
+            query = query.filter(Order.id_партнер == partner_id)
+        
+        orders = query.all()
+        if not orders:
+            QMessageBox.warning(self, "Предупреждение", "Нет заказов для формирования отчёта!")
             return
 
-        order_products = self.session.query(OrderProduct).filter(OrderProduct.id_заказа == order_id).all()
-        if not order_products:
-            QMessageBox.warning(self, "Предупреждение", "В заказе нет продукции для отчёта!")
-            return
-
-        pdf_file = f"order_report_{order_id}.pdf"
+        pdf_file = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         doc = SimpleDocTemplate(pdf_file, pagesize=A4)
         elements = []
         styles = getSampleStyleSheet()
         style = styles['Normal']
-        style.fontName = 'SegoeUIRegular'
-        style.fontSize = 12
+        style.fontName = 'SegoeUI'
+        style.fontSize = 14
 
-        elements.append(Paragraph(f"Заказ #{order.id}", style))
-        elements.append(Paragraph(f"Дата создания: {order.Дата_создания}", style))
-        elements.append(Paragraph("<br/>", style))
+        elements.append(Paragraph("Отчёт по заказам", style))
+        elements.append(Spacer(1, 12))
 
-        data = [["Продукция", "Количество", "Стоимость"]]
-        for op in order_products:
-            product = self.session.query(Product).filter(Product.id == op.id_продукции).first()
-            product_name = product.Наименование if product else "Не указан"
-            data.append([product_name, op.Количество, op.Стоимость or "0.0"])
+        if from_date != placeholder_date or to_date != placeholder_date:
+            elements.append(Paragraph(f"Период: {from_date} - {to_date}", style))
+            elements.append(Spacer(1, 12))
+        if partner_id != 0:
+            partner = self.session.query(Partner).filter(Partner.id == partner_id).first()
+            partner_name = partner.Наименование if partner else "Не указан"
+            elements.append(Paragraph(f"Клиент: {partner_name}", style))
+            elements.append(Spacer(1, 12))
+        elements.append(Paragraph("<br/><br/>", style))
+
+        data = [["ID заказа", "Клиент", "Дата создания", "Общая сумма", "Статус"]]
+        for order in orders:
+            partner_name = order.партнер.Наименование if order.партнер else "Не указан"
+            payment = self.session.query(Payment).filter(Payment.id == order.id_оплата).first()
+            total_amount = payment.Сумма if payment else "0.0"
+            data.append([str(order.id), partner_name, str(order.Дата_создания), str(total_amount), order.Статус or "Не указан"])
 
         table = Table(data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), 'SegoeUIRegular'),
+            ('FONTNAME', (0, 0), (-1, -1), 'SegoeUI'),
             ('FONTSIZE', (0, 0), (-1, 0), 14),
             ('FONTSIZE', (0, 1), (-1, -1), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
@@ -655,4 +801,4 @@ class OrderWidget(QWidget):
 
         elements.append(table)
         doc.build(elements)
-        QMessageBox.information(self, "Успех", f"Отчёт по заказу #{order_id} успешно сохранён как {pdf_file}!")
+        QMessageBox.information(self, "Успех", f"Отчёт по заказам успешно сохранён как {pdf_file}!")

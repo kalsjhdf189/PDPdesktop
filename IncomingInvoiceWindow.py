@@ -1,4 +1,4 @@
-# IncomingInvoiceWindow.py
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QDialog, QFormLayout, 
     QComboBox, QLineEdit, QDateTimeEdit, QMessageBox, QSizePolicy, QScrollArea, QFrame, QLabel
@@ -97,10 +97,10 @@ class IncomingInvoiceCard(QFrame):
         self.invoice = invoice
         self.session = session
 
-        # Основной горизонтальный layout карточки
+        
         layout = QHBoxLayout()
 
-        # Левая часть: основная информация о поступлении
+        
         left_layout = QVBoxLayout()
         product_name = invoice.продукция.Наименование if invoice.продукция else "Не указан"
         warehouse_name = invoice.склад.Название if invoice.склад else "Не указан"
@@ -110,7 +110,7 @@ class IncomingInvoiceCard(QFrame):
         left_layout.addWidget(QLabel(f"Количество: {invoice.Кол_во_товара}"))
         left_layout.addWidget(QLabel(f"Дата: {invoice.Дата_поступления}"))
 
-        # Добавляем информацию в карточку
+        
         layout.addLayout(left_layout)
         self.setLayout(layout)
 
@@ -129,12 +129,12 @@ class IncomingInvoiceWidget(QWidget):
         self.add_btn.setStyleSheet(ICON_BUTTON_STYLE)
         self.add_btn.setFixedSize(40, 40)
         self.add_btn.clicked.connect(self.add_invoice)
-        self.btn_layout.addWidget(self.add_btn)  # Кнопка добавления слева
+        self.btn_layout.addWidget(self.add_btn)  
         self.btn_layout.addStretch()
 
         self.layout.addLayout(self.btn_layout)
 
-        # Создаем область прокрутки для карточек
+        
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("QScrollArea { border: none; }")
@@ -152,7 +152,7 @@ class IncomingInvoiceWidget(QWidget):
         self.setStyleSheet(TABLE_WIDGET_STYLE)
 
     def load_cards(self):
-        # Очищаем текущие карточки
+        
         for i in reversed(range(self.cards_layout.count())):
             widget = self.cards_layout.itemAt(i).widget()
             if widget is not None:

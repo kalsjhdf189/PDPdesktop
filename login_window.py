@@ -1,4 +1,4 @@
-# login_window.py
+
 import bcrypt
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QComboBox, QLabel, QLineEdit, QMessageBox, QFormLayout
 from PySide6.QtGui import QIcon
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Неверный логин или пароль!")
             
     def open_main_window(self):
-        from main import MainWindow as MainAppWindow  # Отложенный импорт
+        from main import MainWindow as MainAppWindow  
         self.main_window = MainAppWindow()
         self.main_window.show()
         self.close()

@@ -1,6 +1,3 @@
-# styles.py
-
-# Стили для главного окна (MainWindow)
 MAIN_WINDOW_STYLE = """
     QMainWindow {
         background-color: #F5F5F5;
@@ -23,7 +20,6 @@ MAIN_WINDOW_STYLE = """
     }
 """
 
-# Стили для виджетов с таблицами (ProductWidget, MovementWidget, IncomingInvoiceWidget, OrderWidget)
 TABLE_WIDGET_STYLE = """
     QWidget {
         background-color: #F5F5F5;
@@ -58,7 +54,7 @@ TABLE_WIDGET_STYLE = """
         padding: 8px;
         border: none;
     }
-    QLineEdit, QComboBox {
+    QLineEdit, QComboBox, QDateTimeEdit {
         padding: 6px;
         border: 1px solid #BDC3C7;
         border-radius: 4px;
@@ -70,7 +66,6 @@ TABLE_WIDGET_STYLE = """
     }
 """
 
-# Стили для диалогов (AddProductDialog, EditMovementDialog, AddIncomingInvoiceDialog)
 DIALOG_STYLE = """
     QDialog {
         background-color: #F5F5F5;
@@ -116,7 +111,6 @@ QLabel {
 }
 """
 
-# Стили только для OrderWidget (без кнопок)
 ORDER_WIDGET_STYLE = """
     QWidget {
         background-color: #F5F5F5;
@@ -139,7 +133,6 @@ ORDER_WIDGET_STYLE = """
     }
 """
 
-# Новый стиль для окна авторизации (LoginWindow)
 LOGIN_WINDOW_STYLE = """
     QMainWindow {
         background-color: #F5F5F5;

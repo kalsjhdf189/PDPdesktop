@@ -1,4 +1,3 @@
-# PartnerWindow.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton, QScrollArea,
     QDialog, QFormLayout, QComboBox, QLineEdit, QTextEdit, QMessageBox
@@ -6,10 +5,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 import requests
-from datebase import Partner, PartnerType, LegalAddress, Connect
+from datebase import Partner, PartnerType, ScopeApplication, LegalAddress, Connect
 from styles import TABLE_WIDGET_STYLE, CARD_STYLE, DIALOG_STYLE, ICON_BUTTON_STYLE
 
-# API-ключ DaData (замените на ваш ключ)
 DADATA_API_KEY = "045de845fe99870f9368b07ff0592323d0cd1edb"
 DADATA_API_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address"
 
@@ -30,11 +28,11 @@ class PartnerCard(QFrame):
         left_layout = QVBoxLayout()
 
         partner_name = self.partner.Наименование or "Не указан"
-        partner_type = self.partner.тип.Наименование if self.partner.тип else "Не указан"
+        scope_application = self.partner.сфера_применения.Наименование if self.partner.сфера_применения else "Не указан"
         email = self.partner.email or "Не указан"
 
         left_layout.addWidget(QLabel(f"Наименование: {partner_name}"))
-        left_layout.addWidget(QLabel(f"Тип партнёра: {partner_type}"))
+        left_layout.addWidget(QLabel(f"Сфера применения: {scope_application}"))
         left_layout.addWidget(QLabel(f"Email: {email}"))
 
         layout.addLayout(left_layout)
@@ -57,8 +55,8 @@ class AddPartnerDialog(QDialog):
         super().__init__(parent)
         self.session = session
         self.partner = partner
-        self.setWindowTitle("Редактировать партнёра" if partner else "Добавить партнёра")
-        self.address_data = {}  # Для хранения данных адреса из DaData
+        self.setWindowTitle("Редактировать клиента" if partner else "Добавить клиента")
+        self.address_data = {}  
         self.setup_ui()
 
     def setup_ui(self):
@@ -81,8 +79,16 @@ class AddPartnerDialog(QDialog):
         for p_type in partner_types:
             self.type_combo.addItem(p_type.Наименование, p_type.id)
         if self.partner:
-            self.type_combo.setCurrentIndex(self.type_combo.findData(self.partner.id_тип))
-        layout.addRow("Тип партнёра:", self.type_combo)
+            self.type_combo.setCurrentIndex(self.type_combo.findData(self.partner.id_тип_партнера))
+        layout.addRow("Тип клиента:", self.type_combo)
+
+        self.scope_combo = QComboBox()
+        scope_applications = self.session.query(ScopeApplication).all()
+        for scope in scope_applications:
+            self.scope_combo.addItem(scope.Наименование, scope.id)
+        if self.partner:
+            self.scope_combo.setCurrentIndex(self.scope_combo.findData(self.partner.id_сфера_применения))
+        layout.addRow("Сфера применения:", self.scope_combo)
 
         self.phone_edit = QLineEdit(self.partner.Телефон or "" if self.partner else "")
         self.phone_edit.setPlaceholderText("Введите телефон")
@@ -96,7 +102,6 @@ class AddPartnerDialog(QDialog):
         self.sales_points_edit.setPlaceholderText("Введите места продаж")
         layout.addRow("Места продаж:", self.sales_points_edit)
 
-        # Поле для ввода адреса с автозаполнением
         self.address_edit = QLineEdit()
         if self.partner and self.partner.юридический_адрес:
             address = self.partner.юридический_адрес
@@ -107,13 +112,11 @@ class AddPartnerDialog(QDialog):
         self.address_edit.textChanged.connect(self.on_address_changed)
         layout.addRow("Адрес:", self.address_edit)
 
-        # Выпадающий список для подсказок адресов
         self.address_suggestions = QComboBox()
-        self.address_suggestions.setVisible(False)  # Скрыт до получения подсказок
+        self.address_suggestions.setVisible(False)  
         self.address_suggestions.currentIndexChanged.connect(self.on_suggestion_selected)
         layout.addRow("", self.address_suggestions)
 
-        # Поля для адреса (скрыты, заполняются автоматически)
         self.index_edit = QLineEdit()
         self.index_edit.setVisible(False)
         self.region_edit = QLineEdit()
@@ -131,15 +134,13 @@ class AddPartnerDialog(QDialog):
 
         self.setStyleSheet(DIALOG_STYLE)
 
-        # Таймер для предотвращения частых запросов к API
         self.address_timer = QTimer(self)
         self.address_timer.setSingleShot(True)
         self.address_timer.timeout.connect(self.fetch_address_suggestions)
 
     def on_address_changed(self, text):
-        # Запускаем таймер для получения подсказок после паузы
         if text.strip():
-            self.address_timer.start(500)  # 500 мс задержка
+            self.address_timer.start(500)  
         else:
             self.address_suggestions.clear()
             self.address_suggestions.setVisible(False)
@@ -171,7 +172,7 @@ class AddPartnerDialog(QDialog):
             self.address_suggestions.setVisible(False)
 
     def on_suggestion_selected(self, index):
-        if index <= 0:  # Игнорируем "Выберите адрес"
+        if index <= 0:  
             return
 
         suggestion_data = self.address_suggestions.itemData(index)
@@ -180,7 +181,6 @@ class AddPartnerDialog(QDialog):
             self.address_edit.setText(self.address_suggestions.currentText())
             self.address_suggestions.setVisible(False)
 
-            # Заполняем скрытые поля
             self.index_edit.setText(suggestion_data.get("postal_code", ""))
             self.region_edit.setText(suggestion_data.get("region_with_type", ""))
             self.city_edit.setText(suggestion_data.get("city_with_type", "") or suggestion_data.get("settlement_with_type", ""))
@@ -195,11 +195,11 @@ class AddPartnerDialog(QDialog):
             inn = self.inn_edit.text().strip() or None
             director = self.director_edit.text().strip() or None
             type_id = self.type_combo.currentData()
+            scope_id = self.scope_combo.currentData()
             phone = self.phone_edit.text().strip() or None
             email = self.email_edit.text().strip() or None
             sales_points = self.sales_points_edit.toPlainText().strip() or None
 
-            # Проверяем, выбран ли адрес через DaData
             if not self.address_data:
                 raise ValueError("Выберите адрес из подсказок")
 
@@ -220,11 +220,11 @@ class AddPartnerDialog(QDialog):
 
         try:
             if self.partner:
-                # Обновление существующего партнёра
                 self.partner.Наименование = name
                 self.partner.ИНН = inn
                 self.partner.ФИО_директора = director
-                self.partner.id_тип = type_id
+                self.partner.id_тип_партнера = type_id
+                self.partner.id_сфера_применения = scope_id
                 self.partner.Телефон = phone
                 self.partner.email = email
                 self.partner.Места_продаж = sales_points
@@ -247,7 +247,6 @@ class AddPartnerDialog(QDialog):
                     self.session.flush()
                     self.partner.id_юр_адрес = legal_address.id
             else:
-                # Создание нового партнёра
                 legal_address = LegalAddress(
                     Индекс=index,
                     Регион=region,
@@ -263,7 +262,8 @@ class AddPartnerDialog(QDialog):
                     Наименование=name,
                     ИНН=inn,
                     ФИО_директора=director,
-                    id_тип=type_id,
+                    id_тип_партнера=type_id,
+                    id_сфера_применения=scope_id,
                     Телефон=phone,
                     email=email,
                     Места_продаж=sales_points,
@@ -274,7 +274,7 @@ class AddPartnerDialog(QDialog):
             self.accept()
         except Exception as e:
             self.session.rollback()
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить партнёра: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить клиента: {str(e)}")
 
 class PartnerWidget(QWidget):
     def __init__(self, parent=None):
@@ -331,7 +331,7 @@ class PartnerWidget(QWidget):
         partners = self.session.query(Partner).all()
 
         if not partners:
-            self.cards_layout.addWidget(QLabel("Нет партнёров"))
+            self.cards_layout.addWidget(QLabel("Нет клиентов"))
         else:
             for partner in partners:
                 card = PartnerCard(partner, self, self.session)
@@ -347,25 +347,25 @@ class PartnerWidget(QWidget):
         dialog = AddPartnerDialog(self.session, self)
         if dialog.exec() == QDialog.Accepted:
             self.load_cards()
-            QMessageBox.information(self, "Успех", "Партнёр успешно добавлен!")
+            QMessageBox.information(self, "Успех", "Клиент успешно добавлен!")
 
     def edit_partner(self):
         if not self.selected_card:
-            QMessageBox.warning(self, "Предупреждение", "Выберите партнёра для редактирования")
+            QMessageBox.warning(self, "Предупреждение", "Выберите клиента для редактирования")
             return
         partner = self.selected_card.partner
         dialog = AddPartnerDialog(self.session, self, partner)
         if dialog.exec() == QDialog.Accepted:
             self.load_cards()
-            QMessageBox.information(self, "Успех", "Партнёр успешно отредактирован!")
+            QMessageBox.information(self, "Успех", "Клиент успешно отредактирован!")
 
     def delete_partner(self):
         if not self.selected_card:
-            QMessageBox.warning(self, "Предупреждение", "Выберите партнёра для удаления")
+            QMessageBox.warning(self, "Предупреждение", "Выберите клиента для удаления")
             return
         partner = self.selected_card.partner
         reply = QMessageBox.question(
-            self, "Подтверждение", "Вы уверены, что хотите удалить этого партнёра?",
+            self, "Подтверждение", "Вы уверены, что хотите удалить этого клиента?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if reply == QMessageBox.Yes:
@@ -373,7 +373,7 @@ class PartnerWidget(QWidget):
                 self.session.delete(partner)
                 self.session.commit()
                 self.load_cards()
-                QMessageBox.information(self, "Успех", "Партнёр успешно удалён!")
+                QMessageBox.information(self, "Успех", "Клиент успешно удалён!")
             except Exception as e:
                 self.session.rollback()
-                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить партнёра: {str(e)}")
+                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить клиента: {str(e)}")
